@@ -18,7 +18,17 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-### Prisma setup
+# Run using Docker (prod)
+- Build the docker image 
+```bash
+docker build -t self-host-nextjs ./
+```
+- Run the docker container
+```bash
+docker run -p 3000:3000 -d self-host-nextjs
+
+```
+# Prisma setup
 
 - Installing Prism
 ```bash
