@@ -18,19 +18,81 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Prisma setup
 
-## Learn More
+- Installing Prism
+```bash
+pnpm install -D prisma 
+pnpx prisma init
 
-To learn more about Next.js, take a look at the following resources:
+```
+## Configuring Prisma
+- once we ran `pnpx prisma init` cmd it will add the `schema.prisma` and `.env` file with  default code and DATABASE_URL env variable.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- easiest way to install the postgres  database is to use the `docker` container
+```bash
+docker pull postgres
+```
+- start a Postgres instance by running the command below
+```bash
+docker run --name my-postgres -e POSTGRES_USER=root -e POSTGRES_PASSWORD=myuser -e POSTGRES_DB=mydb -p 5432:5432 -d postgres
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+- now we need to configure the `DATABASE_URL` env variable in the `.env` file
+```bash
+DATABASE_URL="postgresql://root:myuser@localhost:5432/mydb"
+```
+- now we can run the `prisma migrate dev` command to create the tables in the database
+```bash
+pnpx prisma migrate dev --name init
 
-## Deploy on Vercel
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Check the Migration Status
+```bash
+pnpx prisma migrate status
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Generate Prisma Client - generates the Prisma client in the node_modules directory, enabling us to use it to interact with your updated database schema.
+```bash
+pnpx prisma generate
+```
+
+- We can also run Prisma Studio, a visual editor for your database
+```bash
+pnpx prisma studio
+```
+
+## Creating the prisma client to interact with the database in nextjs application 
+
+- we can directly using Prisma Client in various parts of your application to interact with the database
+but it is not the most efficient or optimal approach, especially for a server-side environment like Next.js.
+
+- insted,we need to create a dedicated module that ensures Prisma Client is used as a singleton across your application. it is crucial for maintaining efficient and reliable database connections.
+
+- create `lib/prisma.ts` file and add the following code
+```ts
+import { PrismaClient } from "@prisma/client";
+
+const prismaClientSingleton = () => {
+	return new PrismaClient({
+		datasources: { db: { url: process.env.DATABASE_URL } },
+		...(process.env.DEBUG === "1" && {
+			log: ["query", "info"],
+		}),
+	});
+};
+
+type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;
+
+const globalForPrisma = globalThis as unknown as {
+	prisma: PrismaClientSingleton | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+```
+- This code creates a singleton instance of Prisma Client, which is then exported as the `prisma
+- we shold use the Prisma client anywhere in your Next.js 15 application
